@@ -260,3 +260,22 @@ func Optymalizuj(plan [][]int, koszty [][]int) [][]int {
 	}
 	return plan
 }
+
+func ObliczZysk(odbiorcy []Odbiorca, dostawcy []Dostawca, tabelaKosztow [][]int, planTransportu [][]int) (int, int, int) {
+	koszt := 0
+	przychod := 0
+
+	for i := 0; i < len(odbiorcy)-1; i++ {
+		for j := 0; j < len(dostawcy)-1; j++ {
+			przychod += planTransportu[j][i] * odbiorcy[i].Przychod
+		}
+	}
+	for i := 0; i < len(dostawcy)-1; i++ {
+		for j := 0; j < len(odbiorcy)-1; j++ {
+			koszt += planTransportu[i][j] * tabelaKosztow[i][j]
+		}
+	}
+
+	zyskCalkowity := przychod - koszt
+	return zyskCalkowity, przychod, koszt
+}
