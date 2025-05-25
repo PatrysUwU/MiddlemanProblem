@@ -1,14 +1,26 @@
 package controllers
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+type Odbiorca struct {
+	Przychod int `json:"przychod"`
+	Popyt    int `json:"popyt"`
+}
 
 type Dostawca struct {
-	Podaz int
-	Koszt int
+	Podaz int `json:"podaz"`
+	Koszt int `json:"koszt"`
 }
-type Odbiorca struct {
-	Popyt    int
-	Przychod int
+
+type RequestBody struct {
+	Odbiorcy      []Odbiorca `json:"odbiorcy"`
+	Dostawcy      []Dostawca `json:"dostawcy"`
+	TabelaKosztow [][]int    `json:"tabelaKosztow"`
 }
 
 func Macierz_zyskow_j(odbiorcy []Odbiorca, dostawcy []Dostawca, kosztyTransportu [][]int) [][]int {
@@ -278,4 +290,42 @@ func ObliczZysk(odbiorcy []Odbiorca, dostawcy []Dostawca, tabelaKosztow [][]int,
 
 	zyskCalkowity := przychod - koszt
 	return zyskCalkowity, przychod, koszt
+}
+
+func HandleReq(c *gin.Context) {
+	var body RequestBody
+
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	odbiorcy := body.Odbiorcy
+
+	dostawcy := body.Dostawcy
+
+	tabelaKosztow := body.TabelaKosztow
+
+	tabelaZyskowJednostkowych := Macierz_zyskow_j(odbiorcy, dostawcy, tabelaKosztow)
+	fmt.Println(tabelaZyskowJednostkowych)
+	odbiorcy, dostawcy, tabelaZyskowJednostkowych = DodajFikcyjnych(odbiorcy, dostawcy, tabelaZyskowJednostkowych)
+	fmt.Println(tabelaZyskowJednostkowych)
+	tabelaTrasportu := TabelaPrzewozow(odbiorcy, dostawcy, tabelaZyskowJednostkowych)
+	fmt.Println(tabelaTrasportu)
+	fmt.Println(ZmienneDualne(tabelaTrasportu, tabelaZyskowJednostkowych))
+	result := Optymalizuj(tabelaTrasportu, tabelaZyskowJednostkowych)
+	fmt.Println(result)
+
+	koszt, przychod, zyskCalkowity := ObliczZysk(odbiorcy, dostawcy, tabelaZyskowJednostkowych, result)
+
+	fmt.Println(zyskCalkowity)
+	fmt.Println(przychod)
+	fmt.Println(koszt)
+
+	c.JSON(http.StatusOK, gin.H{
+		"zyskCalkowity":    zyskCalkowity,
+		"tabelaTransportu": tabelaTrasportu,
+		"przychod":         przychod,
+		"koszt":            koszt,
+	})
 }
