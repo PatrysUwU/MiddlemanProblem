@@ -8,13 +8,13 @@ import (
 )
 
 type Odbiorca struct {
-	Przychod int `json:"przychod"`
-	Popyt    int `json:"popyt"`
+	Przychod int `json:"cena"`
+	Popyt    int `json:"ilosc"`
 }
 
 type Dostawca struct {
-	Podaz int `json:"podaz"`
-	Koszt int `json:"koszt"`
+	Podaz int `json:"ilosc"`
+	Koszt int `json:"cena"`
 }
 
 type RequestBody struct {
@@ -301,10 +301,13 @@ func HandleReq(c *gin.Context) {
 	}
 
 	odbiorcy := body.Odbiorcy
+	fmt.Println(odbiorcy)
 
 	dostawcy := body.Dostawcy
+	fmt.Println(dostawcy)
 
 	tabelaKosztow := body.TabelaKosztow
+	fmt.Println(tabelaKosztow)
 
 	tabelaZyskowJednostkowych := Macierz_zyskow_j(odbiorcy, dostawcy, tabelaKosztow)
 	fmt.Println(tabelaZyskowJednostkowych)
@@ -323,9 +326,10 @@ func HandleReq(c *gin.Context) {
 	fmt.Println(koszt)
 
 	c.JSON(http.StatusOK, gin.H{
-		"zyskCalkowity":    zyskCalkowity,
-		"tabelaTransportu": tabelaTrasportu,
-		"przychod":         przychod,
-		"koszt":            koszt,
+		"tabelaZyskowJednostkowych": tabelaZyskowJednostkowych,
+		"zyskCalkowity":             zyskCalkowity,
+		"tabelaTransportu":          tabelaTrasportu,
+		"przychod":                  przychod,
+		"koszt":                     koszt,
 	})
 }

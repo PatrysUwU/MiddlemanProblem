@@ -1,207 +1,170 @@
+import React from "react";
+import { useFormik, FieldArray, FormikProvider } from "formik";
 import {
-  Container,
-  Typography,
   Button,
-  Box,
+  MenuItem,
   TextField,
-  Snackbar,
+  Box,
+  Typography,
+  Select,
+  FormControl,
+  InputLabel,
+  Grid,
+  Container,
 } from "@mui/material";
-import { FieldArray, Form, Formik } from "formik";
-import * as Yup from "yup";
-import CloseIcon from "@mui/icons-material/Close";
-import * as axios from "axios";
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import * as Yup from "yup";
 
-interface Row {
-  Name: string;
-  Value: number;
-  Type: string;
-}
+const initialValues = {
+  entries: [{ type: "dostawca", cena: "", ilosc: "" }],
+};
 
-const storedValues = localStorage.getItem("formData");
-const initialValues: { rows: Row[] } = storedValues
-  ? JSON.parse(storedValues)
-  : { rows: [{ activity: "", time: 1, prevActivities: "" }] };
-
-const validationSchema = Yup.object({
-  rows: Yup.array().of(
-    Yup.object({
-      activity: Yup.string().required("Activity name is required"),
-      Value: Yup.number()
-        .required("Supply/Demand is required")
-        .positive("Supply/Demand must be positive"),
-    }),
-  ),
-});
-
-export default function Home() {
+export default function ZyskFormularz() {
+  const validationSchema = Yup.object({
+    entries: Yup.array()
+      .of(
+        Yup.object().shape({
+          type: Yup.string()
+            .oneOf(["dostawca", "odbiorca"], "Nieprawidłowy typ")
+            .required("Typ jest wymagany"),
+          cena: Yup.number()
+            .typeError("Musi być liczbą")
+            .required("Cena jest wymagana")
+            .moreThan(0, "Cena musi być większa od 0"),
+          ilosc: Yup.number()
+            .typeError("Musi być liczbą")
+            .required("Ilość jest wymagana")
+            .moreThan(0, "Ilość musi być większa od 0"),
+        }),
+      )
+      .min(1, "Przynajmniej jeden wpis jest wymagany")
+      .required(),
+  });
   const navigate = useNavigate();
-  const [formValues, setFormValues] = useState(initialValues);
-  const [location, setLocation] = useState("graph");
-  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    const storedValues = localStorage.getItem("formData");
-    if (storedValues) {
-      setFormValues(JSON.parse(storedValues));
-    }
-  }, []);
+  const formik = useFormik({
+    initialValues,
+    validationSchema,
+    onSubmit: (values) => {
+      const dostawcy = values.entries.filter((e) => e.type === "dostawca");
+      const odbiorcy = values.entries.filter((e) => e.type === "odbiorca");
 
+      navigate("/TransportForm", {
+        state: {
+          dostawcy,
+          odbiorcy,
+        },
+      });
+    },
+  });
   return (
-    <Container maxWidth="md" sx={{ textAlign: "center", mt: 10 }}>
-      <Typography variant="h3" gutterBottom>
-        Supply/Demand form
-      </Typography>
+    <Container>
+      <FormikProvider value={formik}>
+        <form onSubmit={formik.handleSubmit}>
+          <FieldArray name="entries">
+            {({ push, remove }) => (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Lista dostawców i odbiorców
+                </Typography>
+                {formik.values.entries.map((entry, index) => {
+                  const entryError = formik.errors.entries?.[index] || {};
+                  const entryTouched = formik.touched.entries?.[index] || {};
+                  return (
+                    <Grid
+                      sx={{ mb: 3 }}
+                      container
+                      spacing={2}
+                      alignItems="center"
+                      key={index}
+                    >
+                      <Grid item xs={3}>
+                        <FormControl
+                          fullWidth
+                          error={Boolean(entryTouched.type && entryError.type)}
+                        >
+                          <InputLabel>Typ</InputLabel>
+                          <Select
+                            name={`entries[${index}].type`}
+                            value={entry.type}
+                            label="Typ"
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
+                          >
+                            <MenuItem value="dostawca">Dostawca</MenuItem>
+                            <MenuItem value="odbiorca">Odbiorca</MenuItem>
+                          </Select>
+                          {entryTouched.type && entryError.type && (
+                            <FormHelperText>{entryError.type}</FormHelperText>
+                          )}
+                        </FormControl>
+                      </Grid>
 
-      <Formik
-        initialValues={formValues}
-        enableReinitialize
-        validationSchema={validationSchema}
-        onSubmit={async (values) => {
-          localStorage.setItem("formData", JSON.stringify(values));
-          let response = "";
-          try {
-            response = await axios.default.post(
-              "http://localhost:3000/sd",
-              values,
-            );
-          } catch {
-            setOpen(true);
-            return;
-          }
-        }}
-      >
-        {({ values, handleChange, errors, touched }) => (
-          <Form>
-            <FieldArray name="rows">
-              {({ insert, remove, push }) => (
-                <Box>
-                  {values.rows.length > 0 &&
-                    values.rows.map((row, index) => (
-                      <Box
-                        key={index}
-                        sx={{
-                          mb: 2,
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Box sx={{ flex: 1, mr: 1 }}>
-                          <TextField
-                            label="Activity"
-                            name={`rows[${index}].activity`}
-                            value={values.rows[index].activity}
-                            onChange={handleChange}
-                            fullWidth
-                            error={
-                              touched.rows?.[index]?.activity &&
-                              Boolean(errors.rows?.[index]?.activity)
-                            }
-                            helperText={
-                              touched.rows?.[index]?.activity &&
-                              errors.rows?.[index]?.activity
-                            }
-                          />
-                        </Box>
-                        <Box sx={{ flex: 1, mr: 1 }}>
-                          <TextField
-                            label="Time"
-                            name={`rows[${index}].time`}
-                            type="number"
-                            value={values.rows[index].time}
-                            onChange={handleChange}
-                            fullWidth
-                            error={
-                              touched.rows?.[index]?.time &&
-                              Boolean(errors.rows?.[index]?.time)
-                            }
-                            helperText={
-                              touched.rows?.[index]?.time &&
-                              errors.rows?.[index]?.time
-                            }
-                          />
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <TextField
-                            label="Previous Activities"
-                            name={`rows[${index}].prevActivities`}
-                            value={values.rows[index].prevActivities}
-                            onChange={handleChange}
-                            fullWidth
-                            error={
-                              touched.rows?.[index]?.prevActivities &&
-                              Boolean(errors.rows?.[index]?.prevActivities)
-                            }
-                            helperText={
-                              touched.rows?.[index]?.prevActivities &&
-                              errors.rows?.[index]?.prevActivities
-                            }
-                          />
-                        </Box>
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          name={`entries[${index}].cena`}
+                          label="Cena zakupu / Przychód"
+                          value={entry.cena}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          type="number"
+                          error={Boolean(entryTouched.cena && entryError.cena)}
+                          helperText={entryTouched.cena && entryError.cena}
+                        />
+                      </Grid>
+
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          name={`entries[${index}].ilosc`}
+                          label="Podaż / Popyt"
+                          value={entry.ilosc}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          type="number"
+                          error={Boolean(
+                            entryTouched.ilosc && entryError.ilosc,
+                          )}
+                          helperText={entryTouched.ilosc && entryError.ilosc}
+                        />
+                      </Grid>
+
+                      <Grid item xs={3}>
                         <Button
                           variant="outlined"
                           color="error"
                           onClick={() => remove(index)}
-                          sx={{ ml: 2, alignSelf: "center" }}
+                          disabled={formik.values.entries.length === 1}
                         >
-                          <CloseIcon />
+                          Usuń
                         </Button>
-                      </Box>
-                    ))}
+                      </Grid>
+                    </Grid>
+                  );
+                })}
+
+                <Box mt={2}>
                   <Button
                     variant="outlined"
                     onClick={() =>
-                      push({ activity: "", time: 1, prevActivities: "" })
+                      push({ type: "dostawca", cena: "", ilosc: "" })
                     }
                   >
-                    Add Row
+                    Dodaj wiersz
                   </Button>
                 </Box>
-              )}
-            </FieldArray>
 
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              sx={{ mt: 3, mr: 2 }}
-              onClick={() => {
-                setLocation("graph");
-              }}
-            >
-              Show Graph
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              sx={{ mt: 3 }}
-              onClick={() => {
-                setLocation("table");
-              }}
-            >
-              Show Table
-            </Button>
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => {
-                localStorage.removeItem("formData");
-                window.location.reload();
-              }}
-              sx={{ ml: 2, mt: 3 }}
-            >
-              Reset
-            </Button>
-          </Form>
-        )}
-      </Formik>
-      <Snackbar
-        open={open}
-        autoHideDuration={3000}
-        message="Wrong items in `Prev activity` field"
-      />
+                <Box mt={4}>
+                  <Button type="submit" variant="contained" color="primary">
+                    Zapisz
+                  </Button>
+                </Box>
+              </>
+            )}
+          </FieldArray>
+        </form>
+      </FormikProvider>
     </Container>
   );
 }
